@@ -1,0 +1,7 @@
+library/
+python/
+staging/
+
+.Rhistory
+.Rproj.user
+*.sqlite*
