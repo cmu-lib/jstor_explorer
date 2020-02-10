@@ -5,17 +5,29 @@ library(lubridate)
 
 function(input, output, session) {
 
+  # corpora ----
+
   available_corpora <- reactive({
     collect(corpora)
   })
 
+  observe({
+    x <- set_names(available_corpora()$corpus_id, nm = available_corpora()$label)
+    updateSelectInput(session, "corpus_menu",
+                      choices = x,
+                      selected = 1)
+  })
+
   corpus_tokens <- reactive({
-    return(st$get("corpus-1-tidy"))
+    req(input$corpus_menu)
+    corpus_key <- paste("corpus", input$corpus_menu, "tidy", sep = "-")
+    st$get(corpus_key)
   })
 
   corpus_metadata <- reactive({
+    req(input$corpus_menu)
     corpus_document %>%
-      filter(corpus_id == 1) %>%
+      filter(corpus_id == input$corpus_menu) %>%
       inner_join(document_metadata, by = "document_id") %>%
       arrange(date, parent_title, item_title) %>%
       collect()
@@ -76,7 +88,7 @@ function(input, output, session) {
       mutate(
         date = ymd(date),
         url = glue("<a href={url}>{url}</a>")
-        )
+      )
   }, escape = FALSE)
 
   # Bookworm ----
@@ -87,7 +99,7 @@ function(input, output, session) {
       left_join(document_metadata, by = "document_id") %>%
       select(document_id, year) %>%
       collect()
-    })
+  })
 
   bookworm_data <- reactive({
     corpus_tokens() %>%

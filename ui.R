@@ -29,7 +29,10 @@ bookworm_tab <- tabItem(
     )
 )
 
+corpus_selector <- selectInput("corpus_menu", choices = NULL, selected = 1, multiple = FALSE, label = "Corpus")
+
 dash_sidebar <- dashboardSidebar(
+    corpus_selector,
     sidebarMenu(
         menuItem("Bookworm", tabName = "bookworm", icon = icon("chart-line")),
         menuItem("TF-IDF", tabName = "corpus_tf_idf", icon = icon("sort-amount-down"))
