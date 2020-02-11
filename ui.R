@@ -20,12 +20,14 @@ corpus_tf_idf_tab <- tabItem(
 bookworm_tab <- tabItem(
     tabName = "bookworm",
     h2("Terms over time"),
+    list(
     box(
         selectizeInput("wordchart_tokens", choices = NULL, selected = NULL, multiple = TRUE, label = "Pick tokens to plot over time")
     ),
     box(
         plotOutput("bookworm_chart"),
         width = 12
+    )
     )
 )
 

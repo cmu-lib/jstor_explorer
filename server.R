@@ -20,14 +20,17 @@ function(input, output, session) {
 
   corpus_tokens <- reactive({
     req(input$corpus_menu)
-    corpus_key <- paste("corpus", input$corpus_menu, "tidy", sep = "-")
+    corpus_key <- corpus_rdata %>%
+      filter(corpus_id == local(input$corpus_menu), object_type == "tidy-tokens") %>%
+      collect() %>%
+      pull(storr_key)
     st$get(corpus_key)
   })
 
   corpus_metadata <- reactive({
     req(input$corpus_menu)
     corpus_document %>%
-      filter(corpus_id == input$corpus_menu) %>%
+      filter(corpus_id == local(input$corpus_menu)) %>%
       inner_join(document_metadata, by = "document_id") %>%
       arrange(date, parent_title, item_title) %>%
       collect()
