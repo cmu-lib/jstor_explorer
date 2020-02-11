@@ -3,7 +3,7 @@ library(RSQLite)
 library(tidyverse)
 library(storr)
 
-db <- dbConnect(SQLite(), "data/corpus.sqlite3")
+db <- dbConnect(SQLite(), "data/corpus.sqlite3", flags = SQLITE_RO)
 dbExecute(db, "PRAGMA foreign_keys = ON")
 st <- storr_dbi("storr_data", "storr_keys", db, binary = TRUE)
 
