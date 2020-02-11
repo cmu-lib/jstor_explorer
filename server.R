@@ -90,13 +90,13 @@ function(input, output, session) {
       select(doc_type, item_title, parent_title, date, url, top_terms) %>%
       mutate(
         date = ymd(date),
-        url = glue("<a href={url}>{url}</a>")
+        url = glue("<a href='{url}' target='_blank' rel='noopener noreferrer'>{url}</a>")
       )
   }, escape = FALSE)
 
-  # Bookworm ----
+  # termsovertime ----
 
-  bookworm_tokens <- reactive({
+  termsovertime_tokens <- reactive({
     corpus_document %>%
       filter(corpus_id == 1) %>%
       left_join(document_metadata, by = "document_id") %>%
@@ -104,9 +104,9 @@ function(input, output, session) {
       collect()
   })
 
-  bookworm_data <- reactive({
+  termsovertime_data <- reactive({
     corpus_tokens() %>%
-      left_join(bookworm_tokens(), by = "document_id") %>%
+      left_join(termsovertime_tokens(), by = "document_id") %>%
       group_by(year) %>%
       mutate(total_docs = n_distinct(document_id)) %>%
       ungroup() %>%
@@ -117,11 +117,26 @@ function(input, output, session) {
       )
   })
 
-  output$bookworm_chart <- renderPlot({
-    bookworm_data() %>%
+  output$termsovertime_chart <- renderPlot({
+    termsovertime_data() %>%
       ggplot(aes(x = year, y = percent_total)) +
       geom_line(aes(color = gram)) +
       xlim(2014, 2020) +
       theme_minimal()
+  }, height = 600)
+
+  termsovertime_metadata <- reactive({
+    corpus_tokens() %>%
+      filter(gram %in% input$wordchart_tokens) %>%
+      distinct(document_id) %>%
+      inner_join(corpus_metadata(), by = "document_id") %>%
+      mutate(
+        date = ymd(date),
+        url = glue("<a href='{url}' target='_blank' rel='noopener noreferrer'>{url}</a>")
+      )
   })
+
+  output$termsovertime_metadata <- renderDataTable({
+    termsovertime_metadata()
+  }, escape = FALSE)
 }

@@ -17,15 +17,22 @@ corpus_tf_idf_tab <- tabItem(
         width = 12)
 )
 
-bookworm_tab <- tabItem(
-    tabName = "bookworm",
+termsovertime_tab <- tabItem(
+    tabName = "termsovertime",
     h2("Terms over time"),
     list(
     box(
-        selectizeInput("wordchart_tokens", choices = NULL, selected = NULL, multiple = TRUE, label = "Pick tokens to plot over time")
+        selectizeInput("wordchart_tokens", choices = NULL, selected = NULL, multiple = TRUE, label = "Pick tokens to plot over time"),
+        p("Begin typing to generate token suggestions. Click on a token and press \"Delete\" to remove it from the list.")
     ),
     box(
-        plotOutput("bookworm_chart"),
+        plotOutput("termsovertime_chart"),
+        width = 12,
+        height = 650
+    ),
+    box(
+        dataTableOutput("termsovertime_metadata"),
+        title = "Documents with these tokens",
         width = 12
     )
     )
@@ -36,14 +43,14 @@ corpus_selector <- selectInput("corpus_menu", choices = NULL, selected = 1, mult
 dash_sidebar <- dashboardSidebar(
     corpus_selector,
     sidebarMenu(
-        menuItem("Bookworm", tabName = "bookworm", icon = icon("chart-line")),
+        menuItem("Historical Change", tabName = "termsovertime", icon = icon("chart-line")),
         menuItem("TF-IDF", tabName = "corpus_tf_idf", icon = icon("sort-amount-down"))
     )
 )
 
 dash_body <- dashboardBody(
     tabItems(
-        bookworm_tab,
+        termsovertime_tab,
         corpus_tf_idf_tab
     )
 )
