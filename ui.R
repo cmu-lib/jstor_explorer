@@ -40,8 +40,13 @@ termsovertime_tab <- tabItem(
 
 corpus_selector <- selectInput("corpus_menu", choices = NULL, selected = 1, multiple = FALSE, label = "Corpus")
 
+corpus_data <- div(
+    p("Number of docs: ", textOutput("corpus_size", inline = TRUE))
+)
+
 dash_sidebar <- dashboardSidebar(
     corpus_selector,
+    corpus_data,
     sidebarMenu(
         menuItem("Historical Change", tabName = "termsovertime", icon = icon("chart-line")),
         menuItem("TF-IDF", tabName = "corpus_tf_idf", icon = icon("sort-amount-down"))

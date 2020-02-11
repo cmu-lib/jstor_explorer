@@ -36,6 +36,10 @@ function(input, output, session) {
       collect()
   })
 
+  output$corpus_size <- renderText({
+    format(nrow(corpus_metadata()), big.mark = ",")
+  })
+
   token_choices <- reactive({
     toks <- corpus_tokens() %>%
       distinct(gram) %>%
@@ -100,18 +104,19 @@ function(input, output, session) {
     corpus_document %>%
       filter(corpus_id == 1) %>%
       left_join(document_metadata, by = "document_id") %>%
-      select(document_id, year) %>%
+      select(document_id, date) %>%
       collect()
   })
 
   termsovertime_data <- reactive({
     corpus_tokens() %>%
       left_join(termsovertime_tokens(), by = "document_id") %>%
-      group_by(year) %>%
+      mutate(approx_date = round_date(ymd(date), "year")) %>%
+      group_by(approx_date) %>%
       mutate(total_docs = n_distinct(document_id)) %>%
       ungroup() %>%
       filter(gram %in% input$wordchart_tokens) %>%
-      group_by(year, gram) %>%
+      group_by(approx_date, gram) %>%
       summarize(
         percent_total = n() / first(total_docs)
       )
@@ -119,9 +124,8 @@ function(input, output, session) {
 
   output$termsovertime_chart <- renderPlot({
     termsovertime_data() %>%
-      ggplot(aes(x = year, y = percent_total)) +
-      geom_line(aes(color = gram)) +
-      xlim(2014, 2020) +
+      ggplot(aes(x = approx_date, y = percent_total, color = gram)) +
+      geom_line() +
       theme_minimal()
   }, height = 600)
 
