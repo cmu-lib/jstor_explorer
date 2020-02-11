@@ -1,7 +1,9 @@
+library(tidyverse)
 library(DBI)
 library(RSQLite)
-library(tidyverse)
 library(storr)
+library(glue)
+library(tidytext)
 
 db <- dbConnect(SQLite(), "data/corpus.sqlite3")
 dbExecute(db, "PRAGMA foreign_keys = ON")
@@ -15,38 +17,93 @@ documents <- tbl(db, "documents")
 document_metadata <- tbl(db, "document_metadata")
 corpora <- tbl(db, "corpus")
 corpus_document <- tbl(db, "corpus_document")
+corpus_rdata <- tbl(db, "corpus_rdata")
 
-ai_docs <- bigrams %>%
-  filter(bigram == "artificial intelligence") %>%
-  left_join(document_bigram, by = "bigram_id")
+#' @param special_bigrams These bigrams will be explicitly added to the "tokens" table
+create_corpus <- function(db, st, including_all_unigrams = NULL, including_all_bigrams = NULL, special_bigrams = c("artificial intelligence", "machine learning", "big data"), corpus_label = "'Ethics' and 'Robots'") {
+  if (corpora %>%
+      filter(label == corpus_label) %>%
+      collect() %>%
+      nrow() != 0) {
+    stop(glue("A corpus labelled \"{corpus_label}\" already exists."))
+  }
 
-ethics_docs <- unigrams %>%
-  filter(unigram == "ethics") %>%
-  left_join(document_unigram, by = "unigram_id")
+  corpus_document_ids <- documents %>%
+    select(document_id)
 
-ethics_and_ai_docs <- intersect(ai_docs %>% select(document_id), ethics_docs %>% select(document_id))
+  if (!is.null(including_all_unigrams)) {
+    inclusive_unigrams <- unigrams %>%
+      filter(unigram %in% including_all_unigrams)
 
-# dbAppendTable(db, "corpus", tibble(label = "'Ethics' and 'Artificial Intelligence' all years"))
-# dbAppendTable(db, "corpus_document", collect(ethics_and_ai_docs) %>% mutate(corpus_id = 1))
+    inclusive_unigram_docs <- inclusive_unigrams %>%
+      left_join(document_unigram, by = "unigram_id")
+
+    corpus_document_ids <- corpus_document_ids %>%
+      semi_join(inclusive_unigram_docs, by = "document_id")
+  }
+
+  if (!is.null(including_all_bigrams)) {
+    inclusive_bigrams <- bigrams %>%
+      filter(bigram %in% including_all_bigrams)
+
+    inclusive_bigram_docs <- inclusive_bigrams %>%
+      left_join(document_bigram, by = "bigram_id")
+
+    corpus_document_ids <- corpus_document_ids %>%
+      semi_join(inclusive_bigram_docs, by = "document_id")
+  }
+
+  message("Collecting document ids...")
+  dbExecute(db, "DROP TABLE IF EXISTS temp_corpus_table")
+
+
+  corpus_document_ids %>%
+    compute("temp_corpus_table")
+
+  temp_corpus_table <- tbl(db, "temp_corpus_table")
+
+  inclusive_bigrams <- bigrams %>%
+    filter(bigram %in% c(special_bigrams, including_all_bigrams))
+
+  corpus_tokens <- union(
+    document_unigram %>%
+      inner_join(unigrams, by = "unigram_id") %>% # join all unigrams
+      filter(is_numeric == 0) %>%
+      semi_join(temp_corpus_table, by = "document_id") %>%
+      select(document_id, gram = unigram, n),
+    document_bigram %>%
+      inner_join(inclusive_bigrams, by = "bigram_id") %>% # join only included & special bigrams
+      semi_join(temp_corpus_table, by = "document_id") %>%
+      select(document_id, gram = bigram, n)
+  )
+
+  dbAppendTable(db, "corpus", tibble(label = corpus_label))
+  new_corpus_id <- corpora %>%
+    filter(label == corpus_label) %>%
+    compute() %>%
+    pull(corpus_id)
+
+  dbExecute(db, glue("INSERT OR IGNORE INTO corpus_document SELECT {new_corpus_id} AS corpus_id, document_id FROM temp_corpus_table"))
+
+  message("Collecting tokens...")
+  collected_tokens <- collect(corpus_tokens)
+  collected_token_key <- glue("collected-{new_corpus_id}-tokens")
+  st$set(collected_token_key, collected_tokens)
+  dbAppendTable(db, "corpus_rdata", tibble(corpus_id = new_corpus_id, object_type = "tidy-tokens", storr_key = collected_token_key))
+
+  message("Storing DFM...")
+  token_dfm <- cast_dfm(collected_tokens, document_id, gram, n)
+  dfm_key <- glue("{new_corpus_id}-dfm")
+  st$set(dfm_key, token_dfm)
+  dbAppendTable(db, "corpus_rdata", tibble(corpus_id = new_corpus_id, object_type = "dfm", storr_key = dfm_key))
+
+  return(new_corpus_id)
+}
+
+# create_corpus(db, st, including_all_unigrams = c("ethics"), including_all_bigrams = "artificial intelligence", corpus_label = "'Ethics' and 'Artificial Intelligence' all years")
 #
-# dbAppendTable(db, "corpus", tibble(label = "'Artificial Intelligence' all years"))
-# dbAppendTable(db, "corpus_document", collect(ai_docs %>% distinct(document_id) %>% mutate(corpus_id = 2)))
+# create_corpus(db, st, including_all_unigrams = NULL, including_all_bigrams = "artificial intelligence", corpus_label = "'Artificial Intelligence' all years")
 #
-# #
-# ethics_and_ai_meta <- ethics_and_ai_docs %>%
-#   inner_join(document_metadata, by = "document_id")
+# create_corpus(db, st, including_all_unigrams = "ethics", including_all_bigrams = "big data", corpus_label = "'Big Data' and 'Ethics' all years")
 #
-key_bigrams <- bigrams %>%
-  filter(bigram %in% c("artificial intelligence", "machine learning", "big data"))
-
-# ethics_and_ai_tokens <- union(
-#   document_unigram %>% inner_join(unigrams, by = "unigram_id") %>% filter(is_numeric == 0) %>% semi_join(ethics_and_ai_docs, by = "document_id") %>%  select(document_id, gram = unigram, n),
-#   document_bigram %>% inner_join(key_bigrams, by = "bigram_id") %>% semi_join(ethics_and_ai_docs, by = "document_id") %>% select(document_id, gram = bigram, n)
-# ) %>% collect()
-
-ai_tokens <- union(
-  document_unigram %>% inner_join(unigrams, by = "unigram_id") %>% filter(is_numeric == 0) %>% semi_join(ai_docs, by = "document_id") %>%  select(document_id, gram = unigram, n),
-  document_bigram %>% inner_join(key_bigrams, by = "bigram_id") %>% semi_join(ai_docs, by = "document_id") %>% select(document_id, gram = bigram, n)
-) %>% collect()
-
-st$set("corpus-2-tidy", ai_tokens)
+# create_corpus(db, st, including_all_unigrams = NULL, including_all_bigrams = "big data", corpus_label = "'Big Data' and 'Ethics' all years")
