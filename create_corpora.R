@@ -106,4 +106,4 @@ create_corpus <- function(db, st, including_all_unigrams = NULL, including_all_b
 #
 # create_corpus(db, st, including_all_unigrams = "ethics", including_all_bigrams = "big data", corpus_label = "'Big Data' and 'Ethics' all years")
 #
-# create_corpus(db, st, including_all_unigrams = NULL, including_all_bigrams = "big data", corpus_label = "'Big Data' and 'Ethics' all years")
+# create_corpus(db, st, including_all_unigrams = NULL, including_all_bigrams = "big data", corpus_label = "'Big Data' all years")
