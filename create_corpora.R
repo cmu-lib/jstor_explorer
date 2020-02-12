@@ -20,7 +20,7 @@ corpus_document <- tbl(db, "corpus_document")
 corpus_rdata <- tbl(db, "corpus_rdata")
 
 #' @param special_bigrams These bigrams will be explicitly added to the "tokens" table
-create_corpus <- function(db, st, including_all_unigrams = NULL, including_all_bigrams = NULL, special_bigrams = c("artificial intelligence", "machine learning", "big data"), corpus_label = "'Ethics' and 'Robots'") {
+create_corpus <- function(db, st, including_all_unigrams = NULL, including_all_bigrams = "artificial intelligence", special_bigrams = c("artificial intelligence", "machine learning", "big data"), min_token_n = 20, corpus_label = "'Ethics' and 'Robots'") {
   if (corpora %>%
       filter(label == corpus_label) %>%
       collect() %>%
@@ -65,10 +65,10 @@ create_corpus <- function(db, st, including_all_unigrams = NULL, including_all_b
   inclusive_bigrams <- bigrams %>%
     filter(bigram %in% c(special_bigrams, including_all_bigrams))
 
-  corpus_tokens <- union(
+  corpus_tokens <- dplyr::union(
     document_unigram %>%
       inner_join(unigrams, by = "unigram_id") %>% # join all unigrams
-      filter(is_numeric == 0) %>%
+      filter(is_numeric == 0, nchar >= 3) %>%
       semi_join(temp_corpus_table, by = "document_id") %>%
       select(document_id, gram = unigram, n),
     document_bigram %>%
@@ -86,7 +86,13 @@ create_corpus <- function(db, st, including_all_unigrams = NULL, including_all_b
   dbExecute(db, glue("INSERT OR IGNORE INTO corpus_document SELECT {new_corpus_id} AS corpus_id, document_id FROM temp_corpus_table"))
 
   message("Collecting tokens...")
-  collected_tokens <- collect(corpus_tokens)
+  collected_tokens <- collect(corpus_tokens) %>%
+    group_by(gram) %>%
+    # Only include tokens that appear over min_token_n times across the entire corpus
+    # This has to happen after collecting because it involves filtering on a window function
+    # which is not suported in sqlite
+    filter(n_distinct(document_id) >= min_token_n) %>%
+    ungroup()
   collected_token_key <- glue("collected-{new_corpus_id}-tokens")
   st$set(collected_token_key, collected_tokens)
   dbAppendTable(db, "corpus_rdata", tibble(corpus_id = new_corpus_id, object_type = "tidy-tokens", storr_key = collected_token_key))
@@ -100,10 +106,18 @@ create_corpus <- function(db, st, including_all_unigrams = NULL, including_all_b
   return(new_corpus_id)
 }
 
-# create_corpus(db, st, including_all_unigrams = c("ethics"), including_all_bigrams = "artificial intelligence", corpus_label = "'Ethics' and 'Artificial Intelligence' all years")
-#
-# create_corpus(db, st, including_all_unigrams = NULL, including_all_bigrams = "artificial intelligence", corpus_label = "'Artificial Intelligence' all years")
-#
-# create_corpus(db, st, including_all_unigrams = "ethics", including_all_bigrams = "big data", corpus_label = "'Big Data' and 'Ethics' all years")
-#
-# create_corpus(db, st, including_all_unigrams = NULL, including_all_bigrams = "big data", corpus_label = "'Big Data' all years")
+drop_corpora <- function() {
+  dbExecute(db, "delete from corpus")
+  dbExecute(db, "delete from storr_keys")
+  dbExecute(db, "delete from storr_data")
+}
+
+drop_corpora()
+
+create_corpus(db, st, including_all_unigrams = c("ethics"), including_all_bigrams = "artificial intelligence", corpus_label = "'Ethics' and 'Artificial Intelligence' all years")
+
+create_corpus(db, st, including_all_unigrams = NULL, including_all_bigrams = "artificial intelligence", corpus_label = "'Artificial Intelligence' all years")
+
+create_corpus(db, st, including_all_unigrams = "ethics", including_all_bigrams = "big data", corpus_label = "'Big Data' and 'Ethics' all years")
+
+create_corpus(db, st, including_all_unigrams = NULL, including_all_bigrams = "big data", corpus_label = "'Big Data' all years")
