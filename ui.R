@@ -8,10 +8,7 @@ dash_header <- dashboardHeader(
 corpus_tf_idf_tab <- tabItem(
     tabName = "corpus_tf_idf",
     h2("TF-IDF of the corpus documents"),
-    box(
-        selectizeInput("tfidf_stoplist", choices = NULL, selected = NULL, multiple = TRUE, label = "Eliminate tokens from TF-IDF"),
-        p("Add tokens to exluce from the TF-IDF calculations.")
-    ),
+    p("This view shows all the documents in the corpus, and shows the top 10 tokens for each document according to TF-IDF (terms that appear relatively frequently in that individual document, but rarely across the larger corpus, suggesting that they are terms distinctive to that document.)"),
     box(dataTableOutput("document_metadata"),
         title = "Document TF-IDF",
         width = 12)
@@ -20,6 +17,7 @@ corpus_tf_idf_tab <- tabItem(
 termsovertime_tab <- tabItem(
     tabName = "termsovertime",
     h2("Terms over time"),
+    p("Add tokens to the box below to chart what percentage of documents in the corpus contain them at different points in time. Currently, the documents are clustered into halfyear buckets."),
     list(
     box(
         selectizeInput("wordchart_tokens", choices = NULL, selected = NULL, multiple = TRUE, label = "Pick tokens to plot over time"),
@@ -38,6 +36,18 @@ termsovertime_tab <- tabItem(
     )
 )
 
+yearly_tfidf_tab <- tabItem(
+    tabName = "yearly_tfidf",
+    h2("TF-IDF by year"),
+    p("This experiment runs TF-IDF again, but tries it on entire years, to find what words are distinctive to particular years.",
+      strong("I am very dubious about this as an approach, but it was a cheap thing to try before diving in to topic modeling...")),
+    list(
+        box(
+            dataTableOutput("yearly_tf_idf_table")
+        )
+    )
+)
+
 corpus_selector <- selectInput("corpus_menu", choices = NULL, selected = 1, multiple = FALSE, label = "Corpus")
 
 corpus_data <- div(
@@ -48,15 +58,17 @@ dash_sidebar <- dashboardSidebar(
     corpus_selector,
     corpus_data,
     sidebarMenu(
-        menuItem("Historical Change", tabName = "termsovertime", icon = icon("chart-line")),
-        menuItem("TF-IDF", tabName = "corpus_tf_idf", icon = icon("sort-amount-down"))
+        menuItem("Historical Term Frequency", tabName = "termsovertime", icon = icon("chart-line")),
+        menuItem("TF-IDF", tabName = "corpus_tf_idf", icon = icon("sort-amount-down")),
+        menuItem("Annual TF-IDF", tabName = "yearly_tfidf", icon = icon("calendar-check"))
     )
 )
 
 dash_body <- dashboardBody(
     tabItems(
         termsovertime_tab,
-        corpus_tf_idf_tab
+        corpus_tf_idf_tab,
+        yearly_tfidf_tab
     )
 )
 

@@ -49,9 +49,6 @@ function(input, output, session) {
   # Update token selectize menus based on selected corpora tokens
   observe({
     x <- token_choices()
-    updateSelectizeInput(session, "tfidf_stoplist",
-                         choices = x,
-                         server = TRUE)
     updateSelectizeInput(session, "wordchart_tokens",
                          choices = x,
                          selected = c("regulation", "big data"),
@@ -61,8 +58,7 @@ function(input, output, session) {
   # TF-IDF ----
 
   refined_tf_idf_tokens <- reactive({
-    corpus_tokens() %>%
-      filter(!(gram %in% input$tfidf_stoplist))
+    corpus_tokens()
   })
 
   corpus_tfidf <- reactive({
@@ -73,20 +69,6 @@ function(input, output, session) {
       arrange(desc(tf_idf)) %>%
       summarize(top_terms = str_c(gram, collapse = ", "))
   })
-
-  # corpus_decade_tfidf <- reactive({
-  #   ethics_and_ai_tokens %>%
-  #     left_join(document_metadata %>% filter(language == "eng") %>% select(document_id, year), by = "document_id", copy = TRUE) %>%
-  #     group_by(gram) %>%
-  #     filter(sum(n) > 10) %>%
-  #     group_by(year, gram) %>%
-  #     summarize(nn = sum(n)) %>%
-  #     bind_tf_idf(gram, year, nn) %>%
-  #     group_by(year) %>%
-  #     filter(row_number(desc(tf_idf)) <= 10) %>%
-  #     arrange(desc(tf_idf)) %>%
-  #     summarize(top_terms = str_c(gram, collapse = ", "))
-  # })
 
   output$document_metadata <- renderDataTable({
     corpus_tfidf() %>%
@@ -142,5 +124,29 @@ function(input, output, session) {
 
   output$termsovertime_metadata <- renderDataTable({
     termsovertime_metadata()
+  }, escape = FALSE)
+
+  # Annual TF-IDF ----
+
+  yearly_tokens <- reactive({
+    corpus_tokens() %>%
+      left_join(corpus_metadata(), by = "document_id") %>%
+      filter(year > 2013) %>%
+      group_by(year, gram) %>%
+      summarize(nn = sum(n))
+  })
+
+  yearly_tf_idf <- reactive({
+    yearly_tokens() %>%
+      bind_tf_idf(gram, year, nn)
+  })
+
+  output$yearly_tf_idf_table <- renderDataTable({
+    # yearly_tf_idf()
+    yearly_tf_idf() %>%
+      group_by(year) %>%
+      arrange(desc(tf_idf)) %>%
+      filter(row_number(desc(tf_idf)) <= 40) %>%
+      summarize(top_terms = str_c(gram, collapse = ", "))
   }, escape = FALSE)
 }
