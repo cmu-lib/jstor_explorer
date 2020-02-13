@@ -50,12 +50,18 @@ yearly_tfidf_tab <- tabItem(
 
 corpus_selector <- selectInput("corpus_menu", choices = NULL, selected = 1, multiple = FALSE, label = "Corpus")
 
+corpus_inclusive <- selectizeInput("corpus_include", choices = NULL, selected = "", multiple = TRUE, label = "Must include terms")
+
+corpus_exclusive <- selectizeInput("corpus_exclude", choices = NULL, selected = "", multiple = TRUE, label = "Must not include terms")
+
 corpus_data <- div(
     p("Number of docs: ", textOutput("corpus_size", inline = TRUE))
 )
 
 dash_sidebar <- dashboardSidebar(
     corpus_selector,
+    corpus_inclusive,
+    corpus_exclusive,
     corpus_data,
     sidebarMenu(
         menuItem("Historical Term Frequency", tabName = "termsovertime", icon = icon("chart-line")),
