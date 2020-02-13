@@ -74,14 +74,15 @@ create_corpus <- function(db, st, including_all_unigrams = NULL, including_all_b
   # %>%
   #   inner_join(unigram_stems, by = "unigram_id") %>%
   #   select(document_id, gram = stem, n) %>%
-  #   group_by(document_id, gram)
+  #   group_by(document_id, gram)%>%
+  #summarize(n = sum(n)),
 
   corpus_tokens <- dplyr::union(
     document_unigram %>%
       inner_join(unigrams, by = "unigram_id") %>% # join all unigrams
       filter(is_numeric == 0, nchar >= 3) %>%
-      semi_join(temp_corpus_table, by = "document_id")%>%
-      summarize(n = sum(n)),
+      semi_join(temp_corpus_table, by = "document_id") %>%
+      select(document_id, gram = unigram, n),
     document_bigram %>%
       inner_join(inclusive_bigrams, by = "bigram_id") %>% # join only included & special bigrams
       semi_join(temp_corpus_table, by = "document_id") %>%
