@@ -220,4 +220,16 @@ walk(trigrams, function(f) {
   })
 })
 
+# Stems ----
+
+library(quanteda)
+
+all_unigrams <- dbGetQuery(db, "SELECT unigram_id, unigram FROM unigrams WHERE is_numeric=0")
+stemmed_unigrams <- all_unigrams %>%
+  mutate(stems = char_wordstem(unigram, language = "eng"))
+
+dbExecute(db, "CREATE TABLE IF NOT EXISTS unigram_stems(unigram_id INTEGER PRIMARY KEY NOT NULL, stem TEXT NOT NULL, FOREIGN KEY (unigram_id) REFERENCES unigrams(unigram_id) ON DELETE CASCADE)")
+
+dbAppendTable(db, "unigram_stems", select(stemmed_unigrams, unigram_id, stem = stems))
+
 dbDisconnect(db)

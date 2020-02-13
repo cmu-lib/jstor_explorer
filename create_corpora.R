@@ -18,6 +18,7 @@ document_metadata <- tbl(db, "document_metadata")
 corpora <- tbl(db, "corpus")
 corpus_document <- tbl(db, "corpus_document")
 corpus_rdata <- tbl(db, "corpus_rdata")
+unigram_stems <- tbl(db, "unigram_stems")
 
 #' @param special_bigrams These bigrams will be explicitly added to the "tokens" table
 create_corpus <- function(db, st, including_all_unigrams = NULL, including_all_bigrams = NULL, special_bigrams = c("artificial intelligence", "machine learning", "big data"), min_token_n = 20, corpus_label) {
@@ -69,12 +70,18 @@ create_corpus <- function(db, st, including_all_unigrams = NULL, including_all_b
   inclusive_bigrams <- bigrams %>%
     filter(bigram %in% c(special_bigrams, including_all_bigrams))
 
+  # Coalesce stemmed words (this hurts browsing tbh)
+  # %>%
+  #   inner_join(unigram_stems, by = "unigram_id") %>%
+  #   select(document_id, gram = stem, n) %>%
+  #   group_by(document_id, gram)
+
   corpus_tokens <- dplyr::union(
     document_unigram %>%
       inner_join(unigrams, by = "unigram_id") %>% # join all unigrams
       filter(is_numeric == 0, nchar >= 3) %>%
-      semi_join(temp_corpus_table, by = "document_id") %>%
-      select(document_id, gram = unigram, n),
+      semi_join(temp_corpus_table, by = "document_id")%>%
+      summarize(n = sum(n)),
     document_bigram %>%
       inner_join(inclusive_bigrams, by = "bigram_id") %>% # join only included & special bigrams
       semi_join(temp_corpus_table, by = "document_id") %>%
@@ -117,7 +124,6 @@ drop_corpora <- function() {
 }
 
 drop_corpora()
-
 
 create_corpus(db, st, including_all_unigrams = NULL, including_all_bigrams = "artificial intelligence", corpus_label = "JSTOR Artificial Intelligence")
 
