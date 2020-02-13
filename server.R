@@ -57,7 +57,6 @@ function(input, output, session) {
 
   filtered_corpus <- reactive({
     uids <- dplyr::setdiff(inclusive_filtered_corpus(), exclusive_filtered_corpus())
-    print(uids)
     corpus_tokens() %>%
       filter(document_id %in% uids)
   })
