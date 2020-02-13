@@ -20,7 +20,7 @@ corpus_document <- tbl(db, "corpus_document")
 corpus_rdata <- tbl(db, "corpus_rdata")
 
 #' @param special_bigrams These bigrams will be explicitly added to the "tokens" table
-create_corpus <- function(db, st, including_all_unigrams = NULL, including_all_bigrams = "artificial intelligence", special_bigrams = c("artificial intelligence", "machine learning", "big data"), min_token_n = 20, corpus_label = "'Ethics' and 'Robots'") {
+create_corpus <- function(db, st, including_all_unigrams = NULL, including_all_bigrams = NULL, special_bigrams = c("artificial intelligence", "machine learning", "big data"), min_token_n = 20, corpus_label) {
   if (corpora %>%
       filter(label == corpus_label) %>%
       collect() %>%
@@ -28,7 +28,11 @@ create_corpus <- function(db, st, including_all_unigrams = NULL, including_all_b
     stop(glue("A corpus labelled \"{corpus_label}\" already exists."))
   }
 
+  english_docs <- document_metadata %>%
+    filter(language %in% c("EN", "en", "eng") | is.na(language), year >= 2013)
+
   corpus_document_ids <- documents %>%
+    semi_join(english_docs, by = "document_id") %>%
     select(document_id)
 
   if (!is.null(including_all_unigrams)) {
@@ -114,10 +118,9 @@ drop_corpora <- function() {
 
 drop_corpora()
 
-create_corpus(db, st, including_all_unigrams = c("ethics"), including_all_bigrams = "artificial intelligence", corpus_label = "'Ethics' and 'Artificial Intelligence' all years")
 
-create_corpus(db, st, including_all_unigrams = NULL, including_all_bigrams = "artificial intelligence", corpus_label = "'Artificial Intelligence' all years")
+create_corpus(db, st, including_all_unigrams = NULL, including_all_bigrams = "artificial intelligence", corpus_label = "JSTOR Artificial Intelligence")
 
-create_corpus(db, st, including_all_unigrams = "ethics", including_all_bigrams = "big data", corpus_label = "'Big Data' and 'Ethics' all years")
+create_corpus(db, st, including_all_unigrams = NULL, including_all_bigrams = "big data", corpus_label = "JSTOR Big Data")
 
-create_corpus(db, st, including_all_unigrams = NULL, including_all_bigrams = "big data", corpus_label = "'Big Data' all years")
+create_corpus(db, st, including_all_unigrams = NULL, including_all_bigrams = "machine learning", corpus_label = "JSTOR Machine Learning")
