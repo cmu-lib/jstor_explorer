@@ -237,9 +237,6 @@ function(input, output, session) {
     )
 
     full_tables <- doc_tables <- purrr::imap(tm_terms(), function(x, i) {
-
-      print(i)
-
       docs_ranking <- sort(min_rank(desc(tm_docs()[,i])))
 
       top_docs <- tibble(document_id = as.integer(names(docs_ranking))) %>%

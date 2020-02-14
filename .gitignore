@@ -5,3 +5,4 @@ staging/
 .Rhistory
 .Rproj.user
 *.sqlite*
+.drake
