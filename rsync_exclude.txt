@@ -1,0 +1,6 @@
+data/corpus.sqlite3
+data/R
+data/*.R
+*.Rproj
+.git/
+.Rhistory
