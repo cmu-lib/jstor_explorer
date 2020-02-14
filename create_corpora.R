@@ -6,8 +6,10 @@ library(glue)
 library(tidytext)
 
 db <- dbConnect(SQLite(), "data/corpus.sqlite3")
+shn <- dbConnect(SQLite(), "data/shiny.sqlite3")
 dbExecute(db, "PRAGMA foreign_keys = ON")
-st <- storr_dbi("storr_data", "storr_keys", db, binary = TRUE)
+dbExecute(shn, "PRAGMA foreign_keys = ON")
+st <- storr_dbi("storr_data", "storr_keys", shn, binary = TRUE)
 
 bigrams <- tbl(db, "bigrams")
 unigrams <- tbl(db, "unigrams")
@@ -15,9 +17,9 @@ document_unigram <- tbl(db, "document_unigram")
 document_bigram <- tbl(db, "document_bigram")
 documents <- tbl(db, "documents")
 document_metadata <- tbl(db, "document_metadata")
-corpora <- tbl(db, "corpus")
-corpus_document <- tbl(db, "corpus_document")
-corpus_rdata <- tbl(db, "corpus_rdata")
+corpora <- tbl(shn, "corpus")
+corpus_document <- tbl(shn, "corpus_document")
+corpus_rdata <- tbl(shn, "corpus_rdata")
 unigram_stems <- tbl(db, "unigram_stems")
 
 #' @param special_bigrams These bigrams will be explicitly added to the "tokens" table
@@ -131,3 +133,5 @@ create_corpus(db, st, including_all_unigrams = NULL, including_all_bigrams = "ar
 create_corpus(db, st, including_all_unigrams = NULL, including_all_bigrams = "big data", corpus_label = "JSTOR Big Data")
 
 create_corpus(db, st, including_all_unigrams = NULL, including_all_bigrams = "machine learning", corpus_label = "JSTOR Machine Learning")
+
+create_corpus(db, st, including_all_unigrams = NULL, including_all_bigrams = NULL, corpus_label = "JSTOR Full")

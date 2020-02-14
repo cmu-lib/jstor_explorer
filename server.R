@@ -19,12 +19,14 @@ function(input, output, session) {
   })
 
   corpus_tokens <- reactive({
-    req(input$corpus_menu)
-    corpus_key <- corpus_rdata %>%
-      filter(corpus_id == local(input$corpus_menu), object_type == "tidy-tokens") %>%
-      collect() %>%
-      pull(storr_key)
-    st$get(corpus_key)
+    withProgress({
+      req(input$corpus_menu)
+      corpus_key <- corpus_rdata %>%
+        filter(corpus_id == local(input$corpus_menu), object_type == "tidy-tokens") %>%
+        collect() %>%
+        pull(storr_key)
+      st$get(corpus_key)
+    }, message = "Loading corpus from disk")
   })
 
   # Document IDs that must be kept in
@@ -56,9 +58,11 @@ function(input, output, session) {
   })
 
   filtered_corpus <- reactive({
-    uids <- dplyr::setdiff(inclusive_filtered_corpus(), exclusive_filtered_corpus())
-    corpus_tokens() %>%
-      filter(document_id %in% uids)
+    withProgress({
+      uids <- dplyr::setdiff(inclusive_filtered_corpus(), exclusive_filtered_corpus())
+      corpus_tokens() %>%
+        filter(document_id %in% uids)
+    }, message = "Filtering corpus")
   })
 
   base_corpus_metadata <- reactive({
@@ -105,12 +109,14 @@ function(input, output, session) {
   # TF-IDF ----
 
   corpus_tfidf <- reactive({
-    filtered_corpus() %>%
-      bind_tf_idf(gram, document_id, n) %>%
-      group_by(document_id) %>%
-      filter(row_number(desc(tf_idf)) <= 10) %>%
-      arrange(desc(tf_idf)) %>%
-      summarize(top_terms = str_c(gram, collapse = ", "))
+    withProgress({
+      filtered_corpus() %>%
+        bind_tf_idf(gram, document_id, n) %>%
+        group_by(document_id) %>%
+        filter(row_number(desc(tf_idf)) <= 10) %>%
+        arrange(desc(tf_idf)) %>%
+        summarize(top_terms = str_c(gram, collapse = ", "))
+    }, message = "Calculating TF-IDF")
   })
 
   output$document_metadata <- renderDataTable({
@@ -134,17 +140,19 @@ function(input, output, session) {
   })
 
   termsovertime_data <- reactive({
-    filtered_corpus() %>%
-      left_join(termsovertime_tokens(), by = "document_id") %>%
-      mutate(approx_date = round_date(ymd(date), "year")) %>%
-      group_by(approx_date) %>%
-      mutate(total_docs = n_distinct(document_id)) %>%
-      ungroup() %>%
-      filter(gram %in% input$wordchart_tokens) %>%
-      group_by(approx_date, gram) %>%
-      summarize(
-        percent_total = n() / first(total_docs)
-      )
+    withProgress({
+      filtered_corpus() %>%
+        left_join(termsovertime_tokens(), by = "document_id") %>%
+        mutate(approx_date = round_date(ymd(date), "year")) %>%
+        group_by(approx_date) %>%
+        mutate(total_docs = n_distinct(document_id)) %>%
+        ungroup() %>%
+        filter(gram %in% input$wordchart_tokens) %>%
+        group_by(approx_date, gram) %>%
+        summarize(
+          percent_total = n() / first(total_docs)
+        )
+    }, message = "Generating terms over time")
   })
 
   output$termsovertime_chart <- renderPlot({
@@ -186,11 +194,13 @@ function(input, output, session) {
   })
 
   output$yearly_tf_idf_table <- renderDataTable({
-    # yearly_tf_idf()
-    yearly_tf_idf() %>%
-      group_by(year) %>%
-      arrange(desc(tf_idf)) %>%
-      filter(row_number(desc(tf_idf)) <= 40) %>%
-      summarize(top_terms = str_c(gram, collapse = ", "))
+    withProgress({
+      # yearly_tf_idf()
+      yearly_tf_idf() %>%
+        group_by(year) %>%
+        arrange(desc(tf_idf)) %>%
+        filter(row_number(desc(tf_idf)) <= 40) %>%
+        summarize(top_terms = str_c(gram, collapse = ", "))
+    }, message = "Calculating annual TF-IDF")
   }, escape = FALSE)
 }
