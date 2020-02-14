@@ -73,9 +73,9 @@ dash_sidebar <- dashboardSidebar(
     corpus_exclusive,
     corpus_data,
     sidebarMenu(
+        menuItem("Historical Term Frequency", tabName = "termsovertime", icon = icon("chart-line")),
         menuItem("TF-IDF", tabName = "corpus_tf_idf", icon = icon("sort-amount-down")),
         menuItem("Annual TF-IDF", tabName = "yearly_tfidf", icon = icon("calendar-check")),
-        menuItem("Historical Term Frequency", tabName = "termsovertime", icon = icon("chart-line")),
         menuItem("Topic Models", tabName = "topic_models", icon = icon("object-group"))
     )
 )

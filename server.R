@@ -132,22 +132,20 @@ function(input, output, session) {
 
   # termsovertime ----
 
-  termsovertime_tokens <- reactive({
-    corpus_document %>%
-      filter(corpus_id == 1) %>%
-      left_join(document_metadata, by = "document_id") %>%
-      select(document_id, date) %>%
-      collect()
+  timegrouped_corpus <- reactive({
+    withProgress({
+    filtered_corpus() %>%
+      left_join(select(corpus_metadata(), document_id, date), by = "document_id") %>%
+      mutate(approx_date = round_date(ymd(date), "halfyear")) %>%
+      group_by(approx_date) %>%
+      mutate(total_docs = n_distinct(document_id)) %>%
+      ungroup()
+    }, message = "Grouping docs into half-years")
   })
 
   termsovertime_data <- reactive({
     withProgress({
-      filtered_corpus() %>%
-        left_join(termsovertime_tokens(), by = "document_id") %>%
-        mutate(approx_date = round_date(ymd(date), "year")) %>%
-        group_by(approx_date) %>%
-        mutate(total_docs = n_distinct(document_id)) %>%
-        ungroup() %>%
+      timegrouped_corpus() %>%
         filter(gram %in% input$wordchart_tokens) %>%
         group_by(approx_date, gram) %>%
         summarize(
