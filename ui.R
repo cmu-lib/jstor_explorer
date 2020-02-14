@@ -48,6 +48,13 @@ yearly_tfidf_tab <- tabItem(
     )
 )
 
+topic_model_tab <- tabItem(
+  tabName = "topic_models",
+  h2("Topic Models"),
+  selectInput("n_topics", label = "Number of topics", choices = c(5, 15, 20), selected = 5, multiple = FALSE),
+  uiOutput("tm_html")
+)
+
 corpus_selector <- selectInput("corpus_menu", choices = NULL, selected = 1, multiple = FALSE, label = "Corpus")
 
 corpus_inclusive <- selectizeInput("corpus_include", choices = NULL, selected = "", multiple = TRUE, label = "Must include terms")
@@ -64,9 +71,10 @@ dash_sidebar <- dashboardSidebar(
     corpus_exclusive,
     corpus_data,
     sidebarMenu(
-        menuItem("Historical Term Frequency", tabName = "termsovertime", icon = icon("chart-line")),
         menuItem("TF-IDF", tabName = "corpus_tf_idf", icon = icon("sort-amount-down")),
-        menuItem("Annual TF-IDF", tabName = "yearly_tfidf", icon = icon("calendar-check"))
+        menuItem("Annual TF-IDF", tabName = "yearly_tfidf", icon = icon("calendar-check")),
+        menuItem("Historical Term Frequency", tabName = "termsovertime", icon = icon("chart-line")),
+        menuItem("Topic Models", tabName = "topic_models", icon = icon("object-group"))
     )
 )
 
@@ -74,7 +82,8 @@ dash_body <- dashboardBody(
     tabItems(
         termsovertime_tab,
         corpus_tf_idf_tab,
-        yearly_tfidf_tab
+        yearly_tfidf_tab,
+        topic_model_tab
     )
 )
 

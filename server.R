@@ -2,6 +2,7 @@ library(shiny)
 library(tidytext)
 library(glue)
 library(lubridate)
+library(topicmodels)
 
 function(input, output, session) {
 
@@ -203,4 +204,69 @@ function(input, output, session) {
         summarize(top_terms = str_c(gram, collapse = ", "))
     }, message = "Calculating annual TF-IDF")
   }, escape = FALSE)
+
+  # Topic models ----
+
+  corpus_tm <- reactive({
+    # withProgress({
+    #   req(input$corpus_menu)
+    #   tm_key <- corpus_rdata %>%
+    #     filter(corpus_id == local(input$corpus_menu),  object_type == "topic-model") %>%
+    #     collect() %>%
+    #     pull(storr_key)
+    #   st$get(corpus_key)
+    # }, message = "Loading topic model from disk")
+    n_topics <- input$n_topics
+    st$get(glue("1-lda-{n_topics}"))
+  })
+
+  tm_terms <- reactive({
+    as.list((as.data.frame(terms(corpus_tm(), 20)))) %>% unname()
+  })
+
+  tm_docs <- reactive({
+    posterior(corpus_tm())[["topics"]]
+  })
+
+  output$tm_html <- renderUI({
+    token_summaries <- shinydashboard::box(
+      title = "Topic terms",
+      purrr::imap(tm_terms(), function(x, i) {
+        p(glue("Topic {i}: "), str_c(x, collapse = ", "))
+      })
+    )
+
+    full_tables <- doc_tables <- purrr::imap(tm_terms(), function(x, i) {
+
+      print(i)
+
+      docs_ranking <- sort(min_rank(desc(tm_docs()[,i])))
+
+      top_docs <- tibble(document_id = as.integer(names(docs_ranking))) %>%
+        inner_join(corpus_metadata(), by = "document_id") %>%
+        select(item_title, doc_type, authors, parent_title, date, url) %>%
+        slice(1:20) %>%
+        mutate(
+          date = ymd(date),
+          url = glue("<a href='{url}' target='_blank' rel='noopener noreferrer'>{url}</a>")
+        )
+
+      docstring <- str_c(x, collapse = ", ")
+
+      shinydashboard::box(
+        title = glue("Topic {i}: {docstring}"),
+        DT::datatable(top_docs, escape = FALSE),
+        width = 12,
+        collapsible = TRUE,
+        collapsed = FALSE
+      )
+    })
+
+    list(
+      token_summaries,
+      full_tables
+    )
+  })
+
+
 }
