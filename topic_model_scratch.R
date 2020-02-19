@@ -29,17 +29,27 @@ jstor_lda <- function(x, k) {
   LDA(converted_x, k = k)
 }
 
+dfm1 <- st$get("1-dfm")
+dfm2 <- st$get("2-dfm")
+dfm3 <- st$get("3-dfm")
+dfm4 <- st$get("4-dfm")
 
 lda_plan = drake_plan(
-  jstor_ai = st$get("1-dfm"),
-  jstor_ai_5_model = jstor_lda(jstor_ai, 5),
-  jstor_ai_10_model = jstor_lda(jstor_ai, 10),
-  jstor_ai_15_model = jstor_lda(jstor_ai, 15),
-  jstor_ai_20_model = jstor_lda(jstor_ai, 20),
-  set_1_lda_5 = st$set("1-lda-5", jstor_ai_5_model),
-  set_1_lda_10 = st$set("1-lda-10", jstor_ai_10_model),
-  set_1_lda_15 = st$set("1-lda-15", jstor_ai_15_model),
-  set_1_lda_20 = st$set("1-lda-20", jstor_ai_20_model),
+  analysis = target(
+    jstor_lda(x = x_value, k = k_value),
+    transform = cross(
+      x_value = c(dfm1, dfm2, dfm3, dfm4),
+      k_value = c(5, 10, 15, 20)
+    )
+  )
 )
 
-make(lda_plan)
+plan(multiprocess)
+
+make(lda_plan, jobs = 4, parallelism = "future")
+
+lda_names <- cached()
+
+walk(lda_names, function(x) {
+  st$set(x, get(x))
+})

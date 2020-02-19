@@ -23,7 +23,7 @@ corpus_rdata <- tbl(shn, "corpus_rdata")
 unigram_stems <- tbl(db, "unigram_stems")
 
 #' @param special_bigrams These bigrams will be explicitly added to the "tokens" table
-create_corpus <- function(db, st, including_all_unigrams = NULL, including_all_bigrams = NULL, special_bigrams = c("artificial intelligence", "machine learning", "big data"), min_token_n = 20, corpus_label) {
+create_corpus <- function(db, shn, st, including_all_unigrams = NULL, including_all_bigrams = NULL, special_bigrams = c("artificial intelligence", "machine learning", "big data", "a i", "computer science"), min_token_n = 20, corpus_label) {
   if (corpora %>%
       filter(label == corpus_label) %>%
       collect() %>%
@@ -63,7 +63,6 @@ create_corpus <- function(db, st, including_all_unigrams = NULL, including_all_b
   message("Collecting document ids...")
   dbExecute(db, "DROP TABLE IF EXISTS temp_corpus_table")
 
-
   corpus_document_ids %>%
     compute("temp_corpus_table")
 
@@ -82,7 +81,7 @@ create_corpus <- function(db, st, including_all_unigrams = NULL, including_all_b
   corpus_tokens <- dplyr::union(
     document_unigram %>%
       inner_join(unigrams, by = "unigram_id") %>% # join all unigrams
-      filter(is_numeric == 0, nchar >= 3) %>%
+      filter((is_numeric == 0 & nchar >= 3) | unigram == "ai") %>%
       semi_join(temp_corpus_table, by = "document_id") %>%
       select(document_id, gram = unigram, n),
     document_bigram %>%
@@ -91,13 +90,17 @@ create_corpus <- function(db, st, including_all_unigrams = NULL, including_all_b
       select(document_id, gram = bigram, n)
   )
 
-  dbAppendTable(db, "corpus", tibble(label = corpus_label))
+  dbAppendTable(shn, "corpus", tibble(label = corpus_label))
   new_corpus_id <- corpora %>%
     filter(label == corpus_label) %>%
-    compute() %>%
+    collect() %>%
     pull(corpus_id)
 
-  dbExecute(db, glue("INSERT OR IGNORE INTO corpus_document SELECT {new_corpus_id} AS corpus_id, document_id FROM temp_corpus_table"))
+  new_corpus_docs <- collect(temp_corpus_table) %>%
+    mutate(corpus_id = new_corpus_id) %>%
+    select(corpus_id, document_id)
+
+  dbAppendTable(shn, "corpus_document", new_corpus_docs)
 
   message("Collecting tokens...")
   collected_tokens <- collect(corpus_tokens) %>%
@@ -109,13 +112,13 @@ create_corpus <- function(db, st, including_all_unigrams = NULL, including_all_b
     ungroup()
   collected_token_key <- glue("collected-{new_corpus_id}-tokens")
   st$set(collected_token_key, collected_tokens)
-  dbAppendTable(db, "corpus_rdata", tibble(corpus_id = new_corpus_id, object_type = "tidy-tokens", storr_key = collected_token_key))
+  dbAppendTable(shn, "corpus_rdata", tibble(corpus_id = new_corpus_id, object_type = "tidy-tokens", storr_key = collected_token_key))
 
   message("Storing DFM...")
   token_dfm <- cast_dfm(collected_tokens, document_id, gram, n)
   dfm_key <- glue("{new_corpus_id}-dfm")
   st$set(dfm_key, token_dfm)
-  dbAppendTable(db, "corpus_rdata", tibble(corpus_id = new_corpus_id, object_type = "dfm", storr_key = dfm_key))
+  dbAppendTable(shn, "corpus_rdata", tibble(corpus_id = new_corpus_id, object_type = "dfm", storr_key = dfm_key))
 
   return(new_corpus_id)
 }
@@ -124,14 +127,17 @@ drop_corpora <- function() {
   dbExecute(db, "delete from corpus")
   dbExecute(db, "delete from storr_keys")
   dbExecute(db, "delete from storr_data")
+  dbExecute(shn, "delete from corpus")
+  dbExecute(shn, "delete from storr_keys")
+  dbExecute(shn, "delete from storr_data")
 }
 
 drop_corpora()
 
-create_corpus(db, st, including_all_unigrams = NULL, including_all_bigrams = "artificial intelligence", corpus_label = "JSTOR Artificial Intelligence")
+create_corpus(db, shn, st, including_all_unigrams = NULL, including_all_bigrams = "artificial intelligence", corpus_label = "JSTOR Artificial Intelligence")
 
-create_corpus(db, st, including_all_unigrams = NULL, including_all_bigrams = "big data", corpus_label = "JSTOR Big Data")
+create_corpus(db, shn, st, including_all_unigrams = NULL, including_all_bigrams = "big data", corpus_label = "JSTOR Big Data")
 
-create_corpus(db, st, including_all_unigrams = NULL, including_all_bigrams = "machine learning", corpus_label = "JSTOR Machine Learning")
+create_corpus(db, shn, st, including_all_unigrams = NULL, including_all_bigrams = "machine learning", corpus_label = "JSTOR Machine Learning")
 
-create_corpus(db, st, including_all_unigrams = NULL, including_all_bigrams = NULL, corpus_label = "JSTOR Full")
+create_corpus(db, shn, st, including_all_unigrams = "ethics", including_all_bigrams = "artificial intelligence", corpus_label = "JSTOR 'Ethics' and 'Artificial Intelligence'")
