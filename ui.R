@@ -53,7 +53,7 @@ topic_model_tab <- tabItem(
   h2("Topic Models"),
   p("LDA model that attempts to model latent clusters of terms ('topics') that tend to co-appear in documents. Documents may belong to multiple topics."),
   p("N.b. I need to pre-compute these models, presently I only have 5- and 10-topic models for the 'JSTOR Artificial Intelligence' corpus."),
-  selectInput("n_topics", label = "Number of topics", choices = c(5, 10), selected = 5, multiple = FALSE),
+  selectInput("n_topics", label = "Number of topics", choices = c(5, 10, 15, 20), selected = 5, multiple = FALSE),
   uiOutput("tm_html")
 )
 

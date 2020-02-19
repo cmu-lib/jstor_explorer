@@ -214,8 +214,9 @@ function(input, output, session) {
     #     pull(storr_key)
     #   st$get(corpus_key)
     # }, message = "Loading topic model from disk")
+    corpus_id <- input$corpus_menu
     n_topics <- input$n_topics
-    st$get(glue("1-lda-{n_topics}"))
+    st$get(glue("analysis_dfm{corpus_id}_{n_topics}"))
   })
 
   tm_terms <- reactive({
