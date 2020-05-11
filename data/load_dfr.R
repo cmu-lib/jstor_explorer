@@ -4,7 +4,7 @@ library(tidyverse)
 library(glue)
 library(progress)
 
-db <- dbConnect(RSQLite::SQLite(), "data/corpus.sqlite3")
+db <- dbConnect(RSQLite::SQLite(), "data/new_corpus.sqlite3")
 dbExecute(db, "PRAGMA foreign_keys = ON")
 RSQLite::initRegExp(db)
 
@@ -45,7 +45,7 @@ dbExecute(db, "CREATE INDEX IF NOT EXISTS corpus_document_document ON corpus_doc
 
 # XML ----
 
-document_xmls <- dir_ls("~/Development/ai-ethics-data/", recurse = TRUE, glob = "*.xml")
+document_xmls <- dir_ls("~/Development/ai-ethics-data/all_ethics/", recurse = TRUE, glob = "*.xml")
 
 pb <- progress_bar$new(total = length(document_xmls))
 dbBegin(db)
@@ -58,8 +58,8 @@ walk(document_xmls, function(f) {
     xml = xmltext,
   )
   dbWriteTable(db, "temp_documents", df, temporary = TRUE, overwrite = TRUE)
-  dbExecute(db, "INSERT INTO documents(docstring) SELECT docstring FROM temp_documents")
-  dbExecute(db, "INSERT INTO document_xml SELECT documents.document_id, temp_documents.xml FROM temp_documents INNER JOIN documents USING (docstring)")
+  dbExecute(db, "INSERT OR IGNORE INTO documents(docstring) SELECT docstring FROM temp_documents")
+  dbExecute(db, "INSERT OR IGNORE INTO document_xml SELECT documents.document_id, temp_documents.xml FROM temp_documents INNER JOIN documents USING (docstring)")
 })
 dbCommit(db)
 
@@ -88,7 +88,39 @@ walk(doc_ids, function(i) {
 
 # Unigrams ----
 
-unigrams <- dir_ls("~/Development/ai-ethics-data/", recurse = TRUE, regexp = "ngram1/*.txt")
+unigrams <- dir_ls("~/Development/ai-ethics-data/all_ethics", recurse = TRUE, regexp = "ngram1/*.txt")
+
+upb <- progress_bar$new(format = "  processing :current [:bar] :percent eta: :eta",
+                        total = length(unigrams))
+unilist <- map(unigrams, function(p) {
+  upb$tick()
+  docstring <- str_replace(path_ext_remove(path_file(p)), "-ngram1", "")
+  tryCatch({
+    ugs <- read_tsv(p, col_types = "ci", col_names = c("token", "n"))
+    ugs$docstring <- docstring
+    return(ugs)
+  }, error = function(e) {
+    return(NULL)
+  })
+})
+
+long_dm <- unilist %>%
+  discard(is_null) %>%
+  bind_rows()
+
+distincted_dm <- long_dm %>%
+  distinct(token, docstring, .keep_all = TRUE)
+
+save(distincted_dm, file = "distincted.rda")
+
+with_count <- distincted_dm %>%
+  mutate(tok_count = nchar(token)) %>%
+  add_count(token)
+
+above3 <- with_count %>%
+  filter(tok_count >= 3 & n > 5)
+
+uni_dfm <- cast_dfm(above3, document = "docstring", term = "token", value = "n")
 
 upb <- progress_bar$new(format = "  processing :current [:bar] :percent eta: :eta",
                         total = length(unigrams))
@@ -117,12 +149,37 @@ walk(unigrams, function(f) {
 
 completed_ids <- dbGetQuery(db, "SELECT DISTINCT documents.docstring FROM document_bigram INNER JOIN documents USING (document_id)")$docstring
 
-bigrams_raw <- dir_ls("~/Development/ai-ethics-data/", recurse = TRUE, regexp = "ngram2/*.txt")
+bigrams_raw <- dir_ls("~/Development/ai-ethics-data/all_ethics/", recurse = TRUE, regexp = "ngram2/*.txt")
+upb <- progress_bar$new(format = "  processing :current [:bar] :percent eta: :eta",
+                        total = length(bigrams_raw))
+long_bigrams <- map(bigrams_raw, function(p) {
+  upb$tick()
+  docstring <- str_replace(path_ext_remove(path_file(p)), "-ngram1", "")
+  tryCatch({
+    ugs <- read_tsv(p, col_types = "ci", col_names = c("token", "n")) %>%
+      filter(token %in% c("artificial intelligence", "big data", "machine learning", "computer science"))
+    ugs$docstring <- docstring
+    return(ugs)
+  }, error = function(e) {
+    return(NULL)
+  })
+})
+
+distincted_bigrams <- long_bigrams %>%
+  discard(is_null) %>%
+  bind_rows() %>%
+  distinct(docstring, token, .keep_all = TRUE)
+
+write_tsv(distincted_bigrams, path = "long_bigrams.tsv")
 
 bigrams_filter <- bigrams_raw %>%
   path_file() %>%
   path_ext_remove() %>%
   str_replace("-ngram2", "")
+
+merged_tokens <- bind_rows(above3, distincted_bigrams)
+
+ethics_dfm <- cast_dfm(merged_tokens, document = "docstring", term = "token", value = "n")
 
 bigrams <- bigrams_raw[!(bigrams_filter %in% completed_ids)]
 
